@@ -127,7 +127,6 @@ class Sentence():
         """
 
         # Is NOT mine when we know that count is 0
-
         if self.count == 0:
             return set(self.cells)
         return set()
@@ -232,7 +231,7 @@ class MinesweeperAI():
             # If is in board
             if self.height > i >= 0 and self.width > j >= 0:
                 if (i,j) in self.mines:
-                    count -+ 1
+                    count -= 1
                 elif neighbor not in self.safes:
                     sentence.add(neighbor)
 
@@ -242,6 +241,51 @@ class MinesweeperAI():
         # verifies if in the knowledge base exists a set that is a subset of it, if so, subtract thoose
         # verifies using set.issubset, extract the new array set.difference, subtract count and creates new sentece from it
 
+        #  Repeat until no deductions is possible
+        while True:
+            # We create new arrays to get deductions and test if our knowledge changed
+            newSafes = set()
+            newMines = set()
+
+            # If, based on any of the sentences in self.knowledge, new cells can be marked as safe or as mines, then the function should do so
+            for sentence in self.knowledge:
+                # We add to our array new (for sure) safes/mines
+                # remembering known_safes return a set of safes
+                newSafes.update(sentence.known_safes())
+                newMines.update(sentence.known_mines())
+
+            # After analising known_safes/mines if our sentence added before has something guaranteeing it is a safe/mine, we should mark it in our knowledge
+            for safe in newSafes:
+                self.mark_safe(safe)
+            for mine in newMines:
+                self.mark_mine(mine)
+
+            # Removing {} sentences
+            self.knowledge = [s for s in self.knowledge if len(s.cells) > 0]
+
+
+            # Inference using subset 
+            inferredAny = False
+            inferredSentences = []
+
+            # "comparing each one with each one"
+            for s1 in self.knowledge:
+                for s2 in self.knowledge:
+                    if s1 != s2 and s1.cells.issubset(s2.cells):
+                        diffCells = s2.cells - s1.cells
+                        diffCount = s2.count - s1.count
+                        possible = Sentence(diffCells, diffCount)
+
+                        if possible not in self.knowledge and possible not in inferredSentences:
+                            inferredSentences.append(possible)
+                            inferredAny = True
+
+            # If we got a new inferred sentence, we must run again our loop to verify if we can get more of it 
+            self.knowledge.extend(inferredSentences)
+
+            # If we had nothing changed on our currently knowledge, exit infite loop
+            if not newSafes and not newMines and not inferredAny:
+                break
             
     
     def make_safe_move(self):
@@ -271,9 +315,11 @@ class MinesweeperAI():
         for i in range(self.height):
             for j in range(self.width):
                 cell = (i, j)
+                # testing 1 and 2
                 if cell not in self.moves_made and cell not in self.mines:
                     possible_moves.append(cell)
 
+        # If we have some move to do:
         if possible_moves:
             return random.choice(possible_moves)
         return None
